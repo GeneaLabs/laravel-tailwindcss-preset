@@ -1,5 +1,6 @@
 <?php namespace GeneaLabs\LaravelTailwindcssPreset;
 
+use GeneaLabs\LaravelTailwindcssPreset\Console\Commands\Preset;
 use Illuminate\Foundation\Console\PresetCommand;
 use Illuminate\Support\ServiceProvider;
 

@@ -1,1 +1,6 @@
-# laravel-tailwindcss-preset
+# TailwindCSS Preset for Laravel
+
+## Reasoning
+
+
+## Installation

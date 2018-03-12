@@ -4,55 +4,68 @@ use Symfony\Component\Finder\SplFileInfo;
 
 class Preset
 {
+    protected $archiveFolder = "";
+
     protected function addAuthResources()
     {
-        $archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-        $sourcePath = realpath(__DIR__ . "/../../../");
+        $sourcePath = realpath(__DIR__ . "/../../../resources");
 
-        collect(app("files")->allFiles(__DIR__ . "/../../../resources"))
+        collect(app("files")->allFiles($sourcePath))
             ->filter(function (SplFileInfo $file) {
                 return str_contains($file->getPath(), "resources/views/auth");
             })
-            ->each(function (SplFileInfo $file) use ($archiveFolder, $sourcePath) {
-                $path = str_replace($sourcePath, "", $file->getPath());
+            ->each(function (SplFileInfo $file) use ($sourcePath) {
+                $path = trim(str_replace($sourcePath, "", $file->getPathName()), "/");
 
-                $this->archiveFile($archiveFolder, $path);
+                $this->archiveFile($path);
                 $this->insertNewFile($sourcePath, $path);
             });
     }
 
     protected function addDefaultResources()
     {
-        $archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-        $sourcePath = realpath(__DIR__ . "/../../../");
+        $sourcePath = realpath(__DIR__ . "/../../../resources");
 
-        collect(app("files")->allFiles(__DIR__ . "/../../../resources"))
+        collect(app("files")->allFiles($sourcePath))
             ->reject(function (SplFileInfo $file) {
                 return str_contains($file->getPath(), "resources/views/auth");
             })
-            ->each(function (SplFileInfo $file) use ($archiveFolder, $sourcePath) {
-                $path = str_replace($sourcePath, "", $file->getPath());
+            ->each(function (SplFileInfo $file) use ($sourcePath) {
+                $path = trim(str_replace($sourcePath, "", $file->getPathName()), "/");
 
-                $this->archiveFile($archiveFolder, $path);
+                $this->archiveFile($path);
                 $this->insertNewFile($sourcePath, $path);
             });
     }
 
     protected function archiveFile(
-        string $archiveFolder,
         string $path
     ) {
-        app("files")->move(
-            resource_path($path),
-            resource_path("{$archiveFolder}/{$path}")
-        );
+        tap(app("files"), function ($files) use ($path) {
+            if ($files->exists(resource_path($path))) {
+                if (! $files->exists(dirname(resource_path("{$this->archiveFolder}/{$path}")))) {
+                    $files->makeDirectory(dirname(resource_path("{$this->archiveFolder}/{$path}")), 0755, true);
+                }
+
+                $files->move(
+                    resource_path($path),
+                    resource_path("{$this->archiveFolder}/{$path}")
+                );
+            }
+        });
     }
 
     protected function insertNewFile(
         string $sourcePath,
         string $path
     ) {
-        app("files")->copy("{$sourcePath}/{$path}", resource_path($path));
+        tap(app("files"), function ($files) use ($path, $sourcePath) {
+            if (! $files->exists(dirname(resource_path($path)))) {
+                $files->makeDirectory(dirname(resource_path($path)), 0755, true);
+            }
+
+            $files->copy("{$sourcePath}/{$path}", resource_path($path));
+        });
     }
 
     protected function compileAssets()
@@ -104,47 +117,43 @@ class Preset
 
     protected function updateComposerDependencies(array $dependencies) : array
     {
+        $dependencies["genealabs/laravel-casts"] = "*";
+        $dependencies["genealabs/laravel-mixpanel"] = "*";
+        $dependencies["genealabs/laravel-model-caching"] = "*";
+        $dependencies["genealabs/laravel-null-carbon"] = "*";
+        $dependencies["genealabs/laravel-optimized-postgres"] = "*";
+        $dependencies["genealabs/laravel-authorization-addons"] = "*";
+
         return collect($dependencies)
-            ->push([
-                "genealabs/laravel-casts" => "*",
-                "genealabs/laravel-mixpanel" => "*",
-                "genealabs/laravel-model-caching" => "*",
-                "genealabs/laravel-null-carbon" => "*",
-                "genealabs/laravel-optimized-postgres" => "*",
-                "genealabs/laravel-authorization-addons" => "*",
-                "genealabs/laravel-whoops-atom" => "*",
-            ])
-            ->sort()
+            ->sortKeys()
             ->toArray();
     }
 
     protected function updateComposerDevDependencies(array $devDependencies) : array
     {
+        $devDependencies["genealabs/laravel-whoops-atom"] = "*";
+
         return collect($devDependencies)
-            ->push([
-                "genealabs/laravel-whoops-atom" => "*",
-            ])
-            ->sort()
+            ->sortKeys()
             ->toArray();
     }
 
-    protected function updatePackageDevDependencies(array $devDependencies) : array
+    protected function updateNodeDevDependencies(array $devDependencies) : array
     {
+        $devDependencies["tailwindcss"] = "^0.4";
+        $devDependencies["@fortawesome/fontawesome"] = "*";
+        $devDependencies["@fortawesome/fontawesome-free-brands"] = "*";
+        $devDependencies["@fortawesome/fontawesome-free-solid"] = "*";
+        $devDependencies["@fortawesome/fontawesome-free-regular"] = "*";
+        $devDependencies["@fortawesome/vue-fontawesome"] = "*";
+
         return collect($devDependencies)
-            ->push([
-                "tailwindcss" => "^0.4",
-                "@fortawesome/fontawesome" => "*",
-                "@fortawesome/fontawesome-free-brands" => "*",
-                "@fortawesome/fontawesome-free-solid" => "*",
-                "@fortawesome/fontawesome-free-regular" => "*",
-                "@fortawesome/vue-fontawesome" => "*",
-            ])
             ->except([
                 "bootstrap",
                 "bootstrap-sass",
                 "jquery",
             ])
-            ->sort()
+            ->sortKeys()
             ->toArray();
     }
 
@@ -156,7 +165,7 @@ class Preset
 
         $packages = json_decode(file_get_contents(base_path("package.json")), true);
         $packages["devDependencies"] = $this
-            ->updatePackageDevDependencies($packages["devDependencies"]);
+            ->updateNodeDevDependencies($packages["devDependencies"]);
 
         file_put_contents(
             base_path("package.json"),
@@ -170,11 +179,17 @@ class Preset
             return;
         }
 
-        $packages = json_decode(file_get_contents(base_path("package.json")), true);
-        $packages["require"] = $this
-            ->updateComposerDependencies($packages["require"]);
-        $packages["require-dev"] = $this
-            ->updateComposerDevDependencies($packages["require-dev"]);
+        $packages = json_decode(file_get_contents(base_path("composer.json")), true);
+
+        if (array_key_exists("require", $packages)) {
+            $packages["require"] = $this
+                ->updateComposerDependencies($packages["require"]);
+        }
+
+        if (array_key_exists("require-dev", $packages)) {
+            $packages["require-dev"] = $this
+                ->updateComposerDevDependencies($packages["require-dev"]);
+        }
 
         file_put_contents(
             base_path("composer.json"),
@@ -184,12 +199,16 @@ class Preset
 
     public function install()
     {
+        $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
+
         $this->addAuthResources();
         $this->installWithoutAuth();
     }
 
     public function installWithoutAuth()
     {
+        $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
+
         $this->updateNodePackages();
         $this->updateComposerPackages();
         $this->removeNodeModules();

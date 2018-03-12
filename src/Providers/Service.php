@@ -8,10 +8,17 @@ class Service extends ServiceProvider
 {
     public function boot()
     {
-        (new PresetCommand)->macro('tailwindcss', function ($command) {
-            (new Preset)->install();
-            $command->info('Tailwind CSS scaffolding installed successfully.');
-            $command->info('Please run "npm install && npm run dev" to compile your fresh scaffolding.');
+        tap(new PresetCommand, function ($presetCommand) {
+            $presetCommand->macro('tailwindcss', function ($command) {
+                (new Preset)->install();
+                $command->info('Tailwind CSS scaffolding installed successfully.');
+                $command->info('Please run "npm install && npm run dev" to compile your fresh scaffolding.');
+            });
+            $presetCommand->macro('tailwindcss-withoutAdmin', function ($command) {
+                (new Preset)->install();
+                $command->info('Tailwind CSS scaffolding installed successfully.');
+                $command->info('Please run "npm install && npm run dev" to compile your fresh scaffolding.');
+            });
         });
     }
 }

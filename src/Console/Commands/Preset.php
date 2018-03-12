@@ -182,7 +182,7 @@ class Preset
         );
     }
 
-    public function installWithAuth()
+    public function install()
     {
         $this->addAuthResources();
         $this->installWithoutAuth();

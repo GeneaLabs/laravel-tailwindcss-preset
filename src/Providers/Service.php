@@ -14,8 +14,8 @@ class Service extends ServiceProvider
                 $command->info('Tailwind CSS scaffolding installed successfully.');
                 $command->info('Please run "npm install && npm run dev" to compile your fresh scaffolding.');
             });
-            $presetCommand->macro('tailwindcss-withoutAdmin', function ($command) {
-                (new Preset)->install();
+            $presetCommand->macro('tailwindcss-without-admin', function ($command) {
+                (new Preset)->installWithoutAuth();
                 $command->info('Tailwind CSS scaffolding installed successfully.');
                 $command->info('Please run "npm install && npm run dev" to compile your fresh scaffolding.');
             });

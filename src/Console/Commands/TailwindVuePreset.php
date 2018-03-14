@@ -1,21 +1,37 @@
 <?php namespace GeneaLabs\LaravelTailwindcssPreset\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Foundation\Console\PresetCommand;
 use Symfony\Component\Finder\SplFileInfo;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 
-class TailwindVuePreset
+class TailwindVuePreset extends Command
 {
     protected $archiveFolder = "";
-    protected $cli;
     protected $sourcePath = "";
+    protected $signature = "preset:tailwind-vue {--no-auth}";
+    protected $description = "";
 
-    public function __construct(InputInterface $input, OutputInterface $output)
+    public function __construct()
     {
+        parent::__construct();
+
         $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-        $this->cli = new Command($input, $output);
         $this->sourcePath = realpath(__DIR__ . "/../../../resources");
+    }
+
+    public function handle()
+    {
+        if (! $this->option("no-auth")) {
+            $this->addAuthResources();
+        }
+
+        $this->updateNodePackages();
+        $this->updateComposerPackages();
+        $this->removeNodeModules();
+        $this->removeNodeModules();
+        $this->addDefaultResources();
+        $this->installNpmModules();
+        $this->installComposerPackages();
     }
 
     protected function addAuthResources()
@@ -25,7 +41,7 @@ class TailwindVuePreset
                 return str_contains($file->getPath(), "resources/views/auth");
             });
 
-        $progressBar = $this->cli->output->createProgressBar($files->count());
+        $progressBar = $this->output->createProgressBar($files->count());
         $progressBar->setMessage("Adding auth resources ...");
 
         $files->each(function (SplFileInfo $file) use ($progressBar) {
@@ -45,7 +61,7 @@ class TailwindVuePreset
                 return str_contains($file->getPath(), "resources/views/auth");
             });
 
-        $progressBar = $this->cli->output->createProgressBar($files->count());
+        $progressBar = $this->output->createProgressBar($files->count());
         $progressBar->setMessage("Adding default resources ...");
 
         $files->each(function (SplFileInfo $file) use ($progressBar) {
@@ -201,27 +217,5 @@ class TailwindVuePreset
             base_path("composer.json"),
             json_encode($packages, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT).PHP_EOL
         );
-    }
-
-    public function install()
-    {
-        $this->cli->line("Removing default resources and installing TailwindCss/Vue.js resources (with auth resources).");
-        $this->addAuthResources();
-        $this->installWithoutAuth(true);
-    }
-
-    public function installWithoutAuth(bool $withAuth = false)
-    {
-        if (! $withAuth) {
-            $this->cli->line("Removing default resources and installing TailwindCss/Vue.js resources (with auth resources).");
-        }
-
-        $this->updateNodePackages();
-        $this->updateComposerPackages();
-        $this->removeNodeModules();
-        $this->removeNodeModules();
-        $this->addDefaultResources();
-        $this->installNpmModules();
-        $this->installComposerPackages();
     }
 }

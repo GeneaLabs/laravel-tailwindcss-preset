@@ -3,6 +3,7 @@
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Console\PresetCommand;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\Console\Helper\ProgressBar;
 
 class TailwindVuePreset extends Command
 {
@@ -17,6 +18,8 @@ class TailwindVuePreset extends Command
 
         $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
         $this->sourcePath = realpath(__DIR__ . "/../../../resources");
+        ProgressBar::setFormatDefinition('custom', '%message% 0[%bar%]%max%');
+        ProgressBar::setFormatDefinition('custom-no-max', '%message% [%bar%]');
     }
 
     public function handle()
@@ -32,45 +35,44 @@ class TailwindVuePreset extends Command
         $this->addDefaultResources();
         $this->installNpmModules();
         $this->installComposerPackages();
+        $this->compileAssets();
     }
 
     protected function addAuthResources()
     {
+        $this->output->write("Adding auth resources ...");
+
         $files = collect(app("files")->allFiles($this->sourcePath))
             ->filter(function (SplFileInfo $file) {
                 return str_contains($file->getPath(), "resources/views/auth");
             });
 
-        $progressBar = $this->output->createProgressBar($files->count());
-        $progressBar->setMessage("Adding auth resources ...");
-
-        $files->each(function (SplFileInfo $file) use ($progressBar) {
+        $files->each(function (SplFileInfo $file) {
             $path = trim(str_replace($this->sourcePath, "", $file->getPathName()), "/");
 
             $this->archiveFile($path);
             $this->insertNewFile($path);
-            $progressBar->advance();
         });
+
+        $this->info(" ✅");
     }
 
     protected function addDefaultResources()
     {
-
+        $this->output->write("Adding default resources ...");
         $files = collect(app("files")->allFiles($this->sourcePath))
             ->reject(function (SplFileInfo $file) {
                 return str_contains($file->getPath(), "resources/views/auth");
             });
 
-        $progressBar = $this->output->createProgressBar($files->count());
-        $progressBar->setMessage("Adding default resources ...");
-
-        $files->each(function (SplFileInfo $file) use ($progressBar) {
+        $files->each(function (SplFileInfo $file) {
             $path = trim(str_replace($this->sourcePath, "", $file->getPathName()), "/");
 
             $this->archiveFile($path);
             $this->insertNewFile($path);
-            $progressBar->advance();
         });
+
+        $this->info(" ✅");
     }
 
     protected function archiveFile(string $path)
@@ -98,7 +100,8 @@ class TailwindVuePreset extends Command
 
     protected function compileAssets()
     {
-        shell_exec("cd " . base_path() . " && yarn run prod");
+        $this->output->write("Mixing project assets ...");
+        $this->executeCommand("cd " . base_path() . " && yarn run prod");
     }
 
     protected function ensureComponentDirectoryExists()
@@ -115,14 +118,33 @@ class TailwindVuePreset extends Command
         }
     }
 
+    protected function executeCommand(string $command)
+    {
+        $exitCode = 0;
+        $output = "";
+
+        exec("{$command} 2>&1", $output, $exitCode);
+
+        if ($exitCode === 0) {
+            $this->info(" ✅");
+
+            return;
+        }
+
+        $this->info(" 🔴");
+        $this->error(implode("\n", $output));
+    }
+
     protected function installComposerPackages()
     {
-        shell_exec("cd " . base_path() . " && composer update");
+        $this->output->write("Installing composer packages ...");
+        $this->executeCommand("cd " . base_path() . " && composer update");
     }
 
     protected function installNpmModules()
     {
-        shell_exec("cd " . base_path() . " && yarn");
+        $this->output->write("Installing node modules ...");
+        $this->executeCommand("cd " . base_path() . " && yarn");
     }
 
     protected function removeComposerPackages()

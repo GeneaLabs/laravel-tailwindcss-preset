@@ -1,71 +1,62 @@
 <?php namespace GeneaLabs\LaravelTailwindcssPreset\Console\Commands;
 
-use Symfony\Component\Finder\SplFileInfo;
 use Illuminate\Console\Command;
+use Symfony\Component\Finder\SplFileInfo;
 
-class TailwindVuePreset extends Command
+class TailwindVuePreset
 {
     protected $archiveFolder = "";
-    protected $signature = 'preset:tailwind-vue {--no-admin}';
-    protected $description = 'Command description';
+    protected $cli;
+    protected $sourcePath = "";
 
     public function __construct()
     {
-        parent::__construct();
-
         $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-    }
-
-    public function handle()
-    {
-        if (! $this->options("no-admin")) {
-            $this->addAuthResources();
-        }
-
-        $this->updateNodePackages();
-        $this->updateComposerPackages();
-        $this->removeNodeModules();
-        $this->removeNodeModules();
-        $this->addDefaultResources();
-        $this->installNpmModules();
-        $this->installComposerPackages();
+        $this->cli = new Command;
+        $this->sourcePath = realpath(__DIR__ . "/../../../resources");
     }
 
     protected function addAuthResources()
     {
-        $sourcePath = realpath(__DIR__ . "/../../../resources");
-
-        collect(app("files")->allFiles($sourcePath))
+        $files = collect(app("files")->allFiles($this->sourcePath))
             ->filter(function (SplFileInfo $file) {
                 return str_contains($file->getPath(), "resources/views/auth");
-            })
-            ->each(function (SplFileInfo $file) use ($sourcePath) {
-                $path = trim(str_replace($sourcePath, "", $file->getPathName()), "/");
-
-                $this->archiveFile($path);
-                $this->insertNewFile($sourcePath, $path);
             });
+
+        $progressBar = $this->cli->output->createProgressBar($files->count());
+        $progressBar->setMessage("Adding auth resources ...");
+
+        $files->each(function (SplFileInfo $file) use ($progressBar) {
+            $path = trim(str_replace($this->sourcePath, "", $file->getPathName()), "/");
+
+            $this->archiveFile($path);
+            $this->insertNewFile($path);
+            $progressBar->advance();
+        });
     }
 
     protected function addDefaultResources()
     {
-        $sourcePath = realpath(__DIR__ . "/../../../resources");
 
-        collect(app("files")->allFiles($sourcePath))
+        $files = collect(app("files")->allFiles($this->sourcePath))
             ->reject(function (SplFileInfo $file) {
                 return str_contains($file->getPath(), "resources/views/auth");
-            })
-            ->each(function (SplFileInfo $file) use ($sourcePath) {
-                $path = trim(str_replace($sourcePath, "", $file->getPathName()), "/");
-
-                $this->archiveFile($path);
-                $this->insertNewFile($sourcePath, $path);
             });
+
+        $progressBar = $this->cli->output->createProgressBar($files->count());
+        $progressBar->setMessage("Adding default resources ...");
+
+        $files->each(function (SplFileInfo $file) use ($progressBar) {
+            $path = trim(str_replace($this->sourcePath, "", $file->getPathName()), "/");
+
+            $this->archiveFile($path);
+            $this->insertNewFile($path);
+            $progressBar->advance();
+        });
     }
 
-    protected function archiveFile(
-        string $path
-    ) {
+    protected function archiveFile(string $path)
+    {
         if (app("files")->exists(resource_path($path))) {
             if (! app("files")->exists(dirname(resource_path("{$this->archiveFolder}/{$path}")))) {
                 app("files")->makeDirectory(dirname(resource_path("{$this->archiveFolder}/{$path}")), 0755, true);
@@ -78,15 +69,13 @@ class TailwindVuePreset extends Command
         }
     }
 
-    protected function insertNewFile(
-        string $sourcePath,
-        string $path
-    ) {
+    protected function insertNewFile(string $path)
+    {
         if (! app("files")->exists(dirname(resource_path($path)))) {
             app("files")->makeDirectory(dirname(resource_path($path)), 0755, true);
         }
 
-        app("files")->copy("{$sourcePath}/{$path}", resource_path($path));
+        app("files")->copy("{$this->sourcePath}/{$path}", resource_path($path));
     }
 
     protected function compileAssets()
@@ -210,5 +199,27 @@ class TailwindVuePreset extends Command
             base_path("composer.json"),
             json_encode($packages, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT).PHP_EOL
         );
+    }
+
+    public function install()
+    {
+        $this->cli->line("Removing default resources and installing TailwindCss/Vue.js resources (with auth resources).");
+        $this->addAuthResources();
+        $this->installWithoutAuth(true);
+    }
+
+    public function installWithoutAuth(bool $withAuth = false)
+    {
+        if (! $withAuth) {
+            $this->cli->line("Removing default resources and installing TailwindCss/Vue.js resources (with auth resources).");
+        }
+
+        $this->updateNodePackages();
+        $this->updateComposerPackages();
+        $this->removeNodeModules();
+        $this->removeNodeModules();
+        $this->addDefaultResources();
+        $this->installNpmModules();
+        $this->installComposerPackages();
     }
 }

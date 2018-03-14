@@ -1,10 +1,35 @@
 <?php namespace GeneaLabs\LaravelTailwindcssPreset\Console\Commands;
 
 use Symfony\Component\Finder\SplFileInfo;
+use Illuminate\Console\Command;
 
-class Preset
+class TailwindVuePreset extends Command
 {
     protected $archiveFolder = "";
+    protected $signature = 'preset:tailwind-vue {--no-admin}';
+    protected $description = 'Command description';
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
+    }
+
+    public function handle()
+    {
+        if (! $this->options("no-admin")) {
+            $this->addAuthResources();
+        }
+
+        $this->updateNodePackages();
+        $this->updateComposerPackages();
+        $this->removeNodeModules();
+        $this->removeNodeModules();
+        $this->addDefaultResources();
+        $this->installNpmModules();
+        $this->installComposerPackages();
+    }
 
     protected function addAuthResources()
     {
@@ -41,31 +66,27 @@ class Preset
     protected function archiveFile(
         string $path
     ) {
-        tap(app("files"), function ($files) use ($path) {
-            if ($files->exists(resource_path($path))) {
-                if (! $files->exists(dirname(resource_path("{$this->archiveFolder}/{$path}")))) {
-                    $files->makeDirectory(dirname(resource_path("{$this->archiveFolder}/{$path}")), 0755, true);
-                }
-
-                $files->move(
-                    resource_path($path),
-                    resource_path("{$this->archiveFolder}/{$path}")
-                );
+        if (app("files")->exists(resource_path($path))) {
+            if (! app("files")->exists(dirname(resource_path("{$this->archiveFolder}/{$path}")))) {
+                app("files")->makeDirectory(dirname(resource_path("{$this->archiveFolder}/{$path}")), 0755, true);
             }
-        });
+
+            app("files")->move(
+                resource_path($path),
+                resource_path("{$this->archiveFolder}/{$path}")
+            );
+        }
     }
 
     protected function insertNewFile(
         string $sourcePath,
         string $path
     ) {
-        tap(app("files"), function ($files) use ($path, $sourcePath) {
-            if (! $files->exists(dirname(resource_path($path)))) {
-                $files->makeDirectory(dirname(resource_path($path)), 0755, true);
-            }
+        if (! app("files")->exists(dirname(resource_path($path)))) {
+            app("files")->makeDirectory(dirname(resource_path($path)), 0755, true);
+        }
 
-            $files->copy("{$sourcePath}/{$path}", resource_path($path));
-        });
+        app("files")->copy("{$sourcePath}/{$path}", resource_path($path));
     }
 
     protected function compileAssets()
@@ -80,13 +101,11 @@ class Preset
             resource_path("assets/scss/components"),
         ];
 
-        tap(app("files", function ($files) use ($directories) {
-            foreach ($directories as $directory) {
-                if (! $files->isDirectory($directory)) {
-                    $files->makeDirectory($directory, 0755, true);
-                }
+        foreach ($directories as $directory) {
+            if (! app("files")->isDirectory($directory)) {
+                app("files")->makeDirectory($directory, 0755, true);
             }
-        }));
+        }
     }
 
     protected function installComposerPackages()
@@ -101,18 +120,14 @@ class Preset
 
     protected function removeComposerPackages()
     {
-        tap(app("files"), function ($files) {
-            $files->deleteDirectory(base_path("vendor"));
-            $files->delete(base_path("composer.lock"));
-        });
+        app("files")->deleteDirectory(base_path("vendor"));
+        app("files")->delete(base_path("composer.lock"));
     }
 
     protected function removeNodeModules()
     {
-        tap(app("files"), function ($files) {
-            $files->deleteDirectory(base_path("node_modules"));
-            $files->delete(base_path("yarn.lock"));
-        });
+        app("files")->deleteDirectory(base_path("node_modules"));
+        app("files")->delete(base_path("yarn.lock"));
     }
 
     protected function updateComposerDependencies(array $dependencies) : array
@@ -195,26 +210,5 @@ class Preset
             base_path("composer.json"),
             json_encode($packages, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT).PHP_EOL
         );
-    }
-
-    public function install()
-    {
-        $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-
-        $this->addAuthResources();
-        $this->installWithoutAuth();
-    }
-
-    public function installWithoutAuth()
-    {
-        $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-
-        $this->updateNodePackages();
-        $this->updateComposerPackages();
-        $this->removeNodeModules();
-        $this->removeNodeModules();
-        $this->addDefaultResources();
-        $this->installNpmModules();
-        $this->installComposerPackages();
     }
 }

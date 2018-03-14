@@ -2,6 +2,8 @@
 
 use Illuminate\Console\Command;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class TailwindVuePreset
 {
@@ -9,10 +11,10 @@ class TailwindVuePreset
     protected $cli;
     protected $sourcePath = "";
 
-    public function __construct()
+    public function __construct(InputInterface $input, OutputInterface $output)
     {
         $this->archiveFolder = "replaced-by-tailwindcss-preset-" . now();
-        $this->cli = new Command;
+        $this->cli = new Command($input, $output);
         $this->sourcePath = realpath(__DIR__ . "/../../../resources");
     }
 
